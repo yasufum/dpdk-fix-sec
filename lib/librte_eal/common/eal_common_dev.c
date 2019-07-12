@@ -171,6 +171,7 @@ local_dev_probe(const char *devargs, struct rte_device **new_dev)
 	 * those devargs shouldn't be removed manually anymore.
 	 */
 
+	dev->devargs->args = da->args;
 	ret = dev->bus->plug(dev);
 	if (ret && !rte_dev_is_probed(dev)) { /* if hasn't ever succeeded */
 		RTE_LOG(ERR, EAL, "Driver cannot attach the device (%s)\n",

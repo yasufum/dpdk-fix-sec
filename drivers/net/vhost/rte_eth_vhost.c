@@ -1343,19 +1343,6 @@ rte_pmd_vhost_probe(struct rte_vdev_device *dev)
 
 	VHOST_LOG(INFO, "Initializing pmd_vhost for %s\n", name);
 
-	if (rte_eal_process_type() == RTE_PROC_SECONDARY) {
-		eth_dev = rte_eth_dev_attach_secondary(name);
-		if (!eth_dev) {
-			VHOST_LOG(ERR, "Failed to probe %s\n", name);
-			return -1;
-		}
-		/* TODO: request info from primary to set up Rx and Tx */
-		eth_dev->dev_ops = &ops;
-		eth_dev->device = &dev->device;
-		rte_eth_dev_probing_finish(eth_dev);
-		return 0;
-	}
-
 	kvlist = rte_kvargs_parse(rte_vdev_device_args(dev), valid_arguments);
 	if (kvlist == NULL)
 		return -1;
@@ -1368,6 +1355,29 @@ rte_pmd_vhost_probe(struct rte_vdev_device *dev)
 	} else {
 		ret = -1;
 		goto out_free;
+	}
+
+	if (rte_eal_process_type() == RTE_PROC_SECONDARY) {
+		eth_dev = rte_eth_dev_attach_secondary(name);
+		if (!eth_dev) {
+			VHOST_LOG(ERR, "Failed to probe %s\n", name);
+			return -1;
+		}
+		/* TODO: request info from primary to set up Rx and Tx */
+		eth_dev->dev_ops = &ops;
+		eth_dev->device = &dev->device;
+
+		eth_dev->rx_pkt_burst = eth_vhost_rx;
+		eth_dev->tx_pkt_burst = eth_vhost_tx;
+		if (rte_vhost_driver_start(iface_name) < 0) {
+			VHOST_LOG(ERR, "Failed to start driver for %s\n",
+				iface_name);
+			ret = -1;
+			goto out_free;
+		}
+
+		rte_eth_dev_probing_finish(eth_dev);
+		return 0;
 	}
 
 	if (rte_kvargs_count(kvlist, ETH_VHOST_QUEUES_ARG) == 1) {
